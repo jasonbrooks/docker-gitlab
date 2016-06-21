@@ -30,6 +30,8 @@ GITLAB_RELATIVE_URL_ROOT=${GITLAB_RELATIVE_URL_ROOT:-}
 GITLAB_RESTRICTED_VISIBILITY=${GITLAB_RESTRICTED_VISIBILITY:-}
 GITLAB_WEBHOOK_TIMEOUT=${GITLAB_WEBHOOK_TIMEOUT:-10}
 GITLAB_GRAVATAR_ENABLED=${GITLAB_GRAVATAR_ENABLED:-true}
+GITLAB_GRAVATAR_HTTP_URL=${GITLAB_GRAVATAR_HTTP_URL:http://www.gravatar.com/avatar/%{hash}?s=%{size}&d=identicon}
+GITLAB_GRAVATAR_HTTPS_URL=${GITLAB_GRAVATAR_HTTPS_URL:https://secure.gravatar.com/avatar/%{hash}?s=%{size}&d=identicon}
 
 SSL_SELF_SIGNED=${SSL_SELF_SIGNED:-false}
 SSL_CERTIFICATE_PATH=${SSL_CERTIFICATE_PATH:-$GITLAB_DATA_DIR/certs/gitlab.crt}
@@ -73,6 +75,10 @@ SMTP_USER=${SMTP_USER:-}
 SMTP_PASS=${SMTP_PASS:-}
 SMTP_OPENSSL_VERIFY_MODE=${SMTP_OPENSSL_VERIFY_MODE:-}
 SMTP_STARTTLS=${SMTP_STARTTLS:-true}
+SMTP_TLS=${SMTP_TLS:-false}
+SMTP_CA_ENABLED=${SMTP_CA_ENABLED:-false}
+SMTP_CA_PATH=${SMTP_CA_PATH:-$GITLAB_DATA_DIR/certs}
+SMTP_CA_FILE=${SMTP_CA_FILE:-$GITLAB_DATA_DIR/certs/ca.crt}
 if [ -n "${SMTP_USER}" ]; then
   SMTP_ENABLED=${SMTP_ENABLED:-true}
   SMTP_AUTHENTICATION=${SMTP_AUTHENTICATION:-login}
@@ -109,6 +115,8 @@ OAUTH_TWITTER_APP_SECRET=${OAUTH_TWITTER_APP_SECRET:-}
 
 OAUTH_GITHUB_API_KEY=${OAUTH_GITHUB_API_KEY:-}
 OAUTH_GITHUB_APP_SECRET=${OAUTH_GITHUB_APP_SECRET:-}
+
+OAUTH_AUTO_SIGN_IN_WITH_PROVIDER=${OAUTH_AUTO_SIGN_IN_WITH_PROVIDER:-}
 
 # is a mysql or postgresql database linked?
 # requires that the mysql or postgresql containers have exposed
@@ -397,6 +405,8 @@ sudo -u git -H sed 's/{{GITLAB_WEBHOOK_TIMEOUT}}/'"${GITLAB_WEBHOOK_TIMEOUT}"'/'
 
 # configure gravatar support
 sudo -u git -H sed 's/{{GITLAB_GRAVATAR_ENABLED}}/'"${GITLAB_GRAVATAR_ENABLED}"'/' -i config/gitlab.yml
+sudo -u git -H sed 's/{{GITLAB_GRAVATAR_HTTP_URL}}/'"${GITLAB_GRAVATAR_HTTP_URL}"'/' -i config/gitlab.yml
+sudo -u git -H sed 's/{{GITLAB_GRAVATAR_HTTPS_URL}}/'"${GITLAB_GRAVATAR_HTTPS_URL}"'/' -i config/gitlab.yml
 
 # configure database
 if [ "${DB_TYPE}" == "postgres" ]; then
@@ -428,6 +438,7 @@ sudo -u git -H sed 's/{{REDIS_PORT}}/'"${REDIS_PORT}"'/g' -i config/resque.yml
 
 # configure gitlab-shell
 sed 's,{{GITLAB_RELATIVE_URL_ROOT}},'"${GITLAB_RELATIVE_URL_ROOT}"',' -i ${GITLAB_SHELL_INSTALL_DIR}/config.yml
+sudo -u git -H sed 's,{{GITLAB_SHELL_INSTALL_DIR}},'"${GITLAB_SHELL_INSTALL_DIR}"',g' -i ${GITLAB_SHELL_INSTALL_DIR}/config.yml
 sudo -u git -H sed 's,{{GITLAB_DATA_DIR}},'"${GITLAB_DATA_DIR}"',g' -i ${GITLAB_SHELL_INSTALL_DIR}/config.yml
 sudo -u git -H sed 's,{{GITLAB_BACKUP_DIR}},'"${GITLAB_BACKUP_DIR}"',g' -i ${GITLAB_SHELL_INSTALL_DIR}/config.yml
 sudo -u git -H sed 's/{{SSL_SELF_SIGNED}}/'"${SSL_SELF_SIGNED}"'/' -i ${GITLAB_SHELL_INSTALL_DIR}/config.yml
@@ -470,6 +481,21 @@ if [ "${SMTP_ENABLED}" == "true" ]; then
     "") sudo -u git -H sed '/{{SMTP_AUTHENTICATION}}/d' -i config/initializers/smtp_settings.rb ;;
     *) sudo -u git -H sed 's/{{SMTP_AUTHENTICATION}}/'"${SMTP_AUTHENTICATION}"'/' -i config/initializers/smtp_settings.rb ;;
   esac
+
+  if [[ ${SMTP_CA_ENABLED} == true ]]; then
+      if [[ -d ${SMTP_CA_PATH} ]]; then
+        sudo -u git -H sed 's,{{SMTP_CA_PATH}},'"${SMTP_CA_PATH}"',' -i config/initializers/smtp_settings.rb
+      fi
+
+      if [[ -f ${SMTP_CA_FILE} ]]; then
+        sudo -u git -H sed 's,{{SMTP_CA_FILE}},'"${SMTP_CA_FILE}"',' -i config/initializers/smtp_settings.rb
+      fi
+    else
+      sudo -u git -H sed '/{{SMTP_CA_PATH}}/d' -i config/initializers/smtp_settings.rb
+      sudo -u git -H sed '/{{SMTP_CA_FILE}}/d' -i config/initializers/smtp_settings.rb
+    fi
+
+  sudo -u git -H sed 's/{{SMTP_TLS}}/'"${SMTP_TLS}"'/' -i config/initializers/smtp_settings.rb
 fi
 
 # apply LDAP configuration
@@ -552,6 +578,15 @@ sudo -u git -H sed 's/{{OAUTH_ENABLED}}/'"${OAUTH_ENABLED}"'/' -i config/gitlab.
 sudo -u git -H sed 's/{{OAUTH_ALLOW_SSO}}/'"${OAUTH_ALLOW_SSO}"'/' -i config/gitlab.yml
 sudo -u git -H sed 's/{{OAUTH_BLOCK_AUTO_CREATED_USERS}}/'"${OAUTH_BLOCK_AUTO_CREATED_USERS}"'/' -i config/gitlab.yml
 
+case $OAUTH_AUTO_SIGN_IN_WITH_PROVIDER in
+  google_oauth2|twitter|github|gitlab|bitbucket|saml)
+    sudo -u git -H sed 's/{{OAUTH_AUTO_SIGN_IN_WITH_PROVIDER}}/'"${OAUTH_AUTO_SIGN_IN_WITH_PROVIDER}"'/' -i config/gitlab.yml
+    ;;
+  *)
+    sudo -u git -H sed '/{{OAUTH_AUTO_SIGN_IN_WITH_PROVIDER}}/d' -i config/gitlab.yml
+    ;;
+esac
+
 # configure nginx vhost
 sed 's,{{GITLAB_INSTALL_DIR}},'"${GITLAB_INSTALL_DIR}"',g' -i /etc/nginx/conf.d/gitlab.conf
 sed 's/{{YOUR_SERVER_FQDN}}/'"${GITLAB_HOST}"'/' -i /etc/nginx/conf.d/gitlab.conf
@@ -628,6 +663,8 @@ touch ${GITLAB_DATA_DIR}/.ssh/authorized_keys
 chmod 700 ${GITLAB_DATA_DIR}/.ssh
 chmod 600 ${GITLAB_DATA_DIR}/.ssh/authorized_keys
 chown -R git:git ${GITLAB_DATA_DIR}/.ssh
+chcon -t ssh_home_t ${GITLAB_DATA_DIR}/.ssh/
+chcon -t ssh_home_t ${GITLAB_DATA_DIR}/.ssh/authorized_keys
 
 appStart () {
   # due to the nature of docker and its use cases, we allow some time

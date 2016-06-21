@@ -2,7 +2,7 @@
   "id": "gitlab",
   "kind": "Service",
   "metadata": {
-    "name": "gitlab-ssh-service",
+    "name": "gitlab-ldap-service",
     "labels": {
       "name": "gitlab"
     }
@@ -11,9 +11,9 @@
   "spec": {
     "ports": [
       {
-        "targetPort": "gitlab-ssh",
-        "port": 22,
-        "nodePort": 30022
+        "targetPort": "gitlab-ldap",
+        "port": 636,
+        "nodePort": 30636
       }
     ],
     "type": "NodePort",

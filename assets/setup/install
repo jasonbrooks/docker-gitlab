@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-GITLAB_VERSION=7.5.3
-GITLAB_SHELL_VERSION=2.2.0
+GITLAB_VERSION=7.14.3
+GITLAB_SHELL_VERSION=2.6.5
 
 GITLAB_HOME="/home/git"
 GITLAB_INSTALL_DIR="${GITLAB_HOME}/gitlab"
@@ -14,7 +14,7 @@ SETUP_DIR="/app/setup"
 GEM_CACHE_DIR="${SETUP_DIR}/cache"
 
 # rebuild yum cache
-yum update
+yum update -y
 
 # install build dependencies for gem installation
 yum install -y gcc gcc-c++ make patch pkgconfig cmake \
@@ -99,6 +99,9 @@ chown -R git:git /home/git/
 
 # added to allow nginx to access gitlab.socket
 chmod o+x /home/git
+
+# set correct selinux labels
+chcon -t user_home_dir_t /home/git
 
 # install gitlab bootscript
 cp lib/support/init.d/gitlab /etc/init.d/gitlab

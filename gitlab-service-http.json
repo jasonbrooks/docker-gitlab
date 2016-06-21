@@ -1,12 +1,25 @@
 {
   "id": "gitlab",
   "kind": "Service",
-  "apiVersion": "v1beta1",
-  "port": 80,
-  "containerPort": "http",
-  "publicIPs": ["STATIC_IP_HERE"],
-  "selector": {
-    "name": "gitlab"
+  "metadata": {
+    "name": "gitlab-http-service",
+    "labels": {
+      "name": "gitlab"
+    }
+  },
+  "apiVersion": "v1",
+  "spec": {
+    "ports": [
+      {
+        "targetPort": "gitlab-http",
+        "port": 80,
+        "nodePort": 30080
+      }
+    ],
+    "type": "NodePort",
+    "selector": {
+      "name": "gitlab"
+    }
   }
 }
 
