@@ -9,9 +9,6 @@ RUN yum install -y supervisor logrotate nginx openssh-server \
     ncurses libffi libxml2 libxslt libcurl libicu rubygem-bundler \
     which sudo passwd tar initscripts cronie nodejs; yum clean all
 RUN sed -i 's/Defaults    requiretty/#Defaults    requiretty/g' /etc/sudoers
-ADD assets/setup/ /app/setup/
-RUN chmod 755 /app/setup/install
-RUN /app/setup/install
 
 ENV GITLAB_VERSION=8.8.5 \
     GITLAB_SHELL_VERSION=2.7.2 \
