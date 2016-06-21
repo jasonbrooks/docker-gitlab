@@ -8,11 +8,20 @@
 # See http://unicorn.bogomips.org/Unicorn/Configurator.html for complete
 # documentation.
 
-# WARNING: See config/application.rb under "Relative url support" for the list of
-# other files that need to be changed for relative url support
+# Note: If you change this file in a Merge Request, please also create a
+# Merge Request on https://gitlab.com/gitlab-org/omnibus-gitlab/merge_requests
+
+# Relative URL support
+# WARNING: We recommend using an FQDN to host GitLab in a root path instead
+# of using a relative URL.
+# Documentation: http://doc.gitlab.com/ce/install/relative_url.html
+# Uncomment and customize the following line to run in a non-root path
 #
 ENV['RAILS_RELATIVE_URL_ROOT'] = "{{GITLAB_RELATIVE_URL_ROOT}}"
 
+# Read about unicorn workers here:
+# http://doc.gitlab.com/ee/install/requirements.html#unicorn-workers
+#
 worker_processes {{UNICORN_WORKERS}}
 
 # Since Unicorn is never exposed to outside clients, it does not need to
