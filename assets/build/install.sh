@@ -7,11 +7,11 @@ GITLAB_WORKHORSE_URL=https://gitlab.com/gitlab-org/gitlab-workhorse/repository/a
 
 GEM_CACHE_DIR="${GITLAB_BUILD_DIR}/cache"
 
-BUILD_DEPENDENCIES="gcc g++ make patch pkg-config cmake paxctl \
-  libc6-dev ruby2.1-dev \
-  libmysqlclient-dev libpq-dev zlib1g-dev libyaml-dev libssl-dev \
-  libgdbm-dev libreadline-dev libncurses5-dev libffi-dev \
-  libxml2-dev libxslt-dev libcurl4-openssl-dev libicu-dev"
+BUILD_DEPENDENCIES="gcc gcc-c++ make patch pkgconfig cmake \
+  glibc-devel rh-ruby22-ruby-devel mysql-devel postgresql-devel \
+  zlib-devel libyaml-devel openssl-devel gdbm-devel readline-devel \
+  ncurses-devel libffi-devel libxml2-devel libxslt-devel \
+  libcurl-devel libicu-devel nodejs wget libuv"
 
 ## Execute a command as GITLAB_USER
 exec_as_git() {
@@ -23,22 +23,25 @@ exec_as_git() {
 }
 
 # install build dependencies for gem installation
-apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y ${BUILD_DEPENDENCIES}
+yum install -y ${BUILD_DEPENDENCIES}
 
 # https://en.wikibooks.org/wiki/Grsecurity/Application-specific_Settings#Node.js
-paxctl -Cm `which nodejs`
+#paxctl -Cm `which nodejs`
 
 # remove the host keys generated during openssh-server installation
 rm -rf /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
 
 # add ${GITLAB_USER} user
-adduser --disabled-login --gecos 'GitLab' ${GITLAB_USER}
+useradd -c 'GitLab' ${GITLAB_USER}
 passwd -d ${GITLAB_USER}
 
 # set PATH (fixes cron job PATH issues)
 cat >> ${GITLAB_HOME}/.profile <<EOF
 PATH=/usr/local/sbin:/usr/local/bin:\$PATH
+EOF
+
+cat >> ${GITLAB_HOME}/.bashrc <<EOF
+source /opt/rh/rh-ruby22/enable
 EOF
 
 # configure git for ${GITLAB_USER}
@@ -55,7 +58,7 @@ chown -R ${GITLAB_USER}: ${GITLAB_SHELL_INSTALL_DIR}
 
 cd ${GITLAB_SHELL_INSTALL_DIR}
 exec_as_git cp -a ${GITLAB_SHELL_INSTALL_DIR}/config.yml.example ${GITLAB_SHELL_INSTALL_DIR}/config.yml
-exec_as_git ./bin/install
+exec_as_git scl enable rh-ruby22 './bin/install'
 
 # remove unused repositories directory created by gitlab-shell install
 exec_as_git rm -rf ${GITLAB_HOME}/repositories
@@ -94,7 +97,7 @@ if [[ -d ${GEM_CACHE_DIR} ]]; then
   mv ${GEM_CACHE_DIR} ${GITLAB_INSTALL_DIR}/vendor/cache
   chown -R ${GITLAB_USER}: ${GITLAB_INSTALL_DIR}/vendor/cache
 fi
-exec_as_git bundle install -j$(nproc) --deployment --without development test aws
+exec_as_git scl enable rh-ruby22 'bundle install -j$(nproc) --deployment --without development test aws'
 
 # make sure everything in ${GITLAB_HOME} is owned by ${GITLAB_USER} user
 chown -R ${GITLAB_USER}: ${GITLAB_HOME}
@@ -104,7 +107,7 @@ exec_as_git cp ${GITLAB_INSTALL_DIR}/config/gitlab.yml.example ${GITLAB_INSTALL_
 exec_as_git cp ${GITLAB_INSTALL_DIR}/config/database.yml.mysql ${GITLAB_INSTALL_DIR}/config/database.yml
 
 echo "Compiling assets. Please be patient, this could take a while..."
-exec_as_git bundle exec rake assets:clean assets:precompile USE_DB=false >/dev/null 2>&1
+exec_as_git scl enable rh-ruby22 'bundle exec rake assets:clean assets:precompile USE_DB=false >/dev/null 2>&1'
 
 # remove auto generated ${GITLAB_DATA_DIR}/config/secrets.yml
 rm -rf ${GITLAB_DATA_DIR}/config/secrets.yml
@@ -132,6 +135,9 @@ exec_as_git ln -sf ${GITLAB_DATA_DIR}/.secret ${GITLAB_INSTALL_DIR}/.secret
 rm -rf ${GITLAB_INSTALL_DIR}/builds
 rm -rf ${GITLAB_INSTALL_DIR}/shared
 
+# set correct selinux labels
+#chcon -t user_home_dir_t ${GITLAB_HOME}
+
 # install gitlab bootscript, to silence gitlab:check warnings
 cp ${GITLAB_INSTALL_DIR}/lib/support/init.d/gitlab /etc/init.d/gitlab
 chmod +x /etc/init.d/gitlab
@@ -149,7 +155,7 @@ sed -i \
 echo "UseDNS no" >> /etc/ssh/sshd_config
 
 # move supervisord.log file to ${GITLAB_LOG_DIR}/supervisor/
-sed -i "s|^[#]*logfile=.*|logfile=${GITLAB_LOG_DIR}/supervisor/supervisord.log ;|" /etc/supervisor/supervisord.conf
+sed -i "s|^[#]*logfile=.*|logfile=${GITLAB_LOG_DIR}/supervisor/supervisord.log ;|" /etc/supervisord.conf
 
 # move nginx logs to ${GITLAB_LOG_DIR}/nginx
 sed -i \
@@ -210,12 +216,12 @@ ${GITLAB_LOG_DIR}/nginx/*.log {
 EOF
 
 # configure supervisord to start unicorn
-cat > /etc/supervisor/conf.d/unicorn.conf <<EOF
+cat > /etc/supervisord.d/unicorn.ini <<EOF
 [program:unicorn]
 priority=10
 directory=${GITLAB_INSTALL_DIR}
 environment=HOME=${GITLAB_HOME}
-command=bundle exec unicorn_rails -c ${GITLAB_INSTALL_DIR}/config/unicorn.rb -E ${RAILS_ENV}
+command=scl enable rh-ruby22 'bundle exec unicorn_rails -c ${GITLAB_INSTALL_DIR}/config/unicorn.rb -E ${RAILS_ENV}'
 user=git
 autostart=true
 autorestart=true
@@ -225,12 +231,12 @@ stderr_logfile=${GITLAB_LOG_DIR}/supervisor/%(program_name)s.log
 EOF
 
 # configure supervisord to start sidekiq
-cat > /etc/supervisor/conf.d/sidekiq.conf <<EOF
+cat > /etc/supervisord.d/sidekiq.ini <<EOF
 [program:sidekiq]
 priority=10
 directory=${GITLAB_INSTALL_DIR}
 environment=HOME=${GITLAB_HOME}
-command=bundle exec sidekiq -c {{SIDEKIQ_CONCURRENCY}}
+command=scl enable rh-ruby22 'bundle exec sidekiq -c {{SIDEKIQ_CONCURRENCY}}
   -q post_receive
   -q mailers
   -q archive_repo
@@ -244,7 +250,7 @@ command=bundle exec sidekiq -c {{SIDEKIQ_CONCURRENCY}}
   -e ${RAILS_ENV}
   -t {{SIDEKIQ_SHUTDOWN_TIMEOUT}}
   -P ${GITLAB_INSTALL_DIR}/tmp/pids/sidekiq.pid
-  -L ${GITLAB_INSTALL_DIR}/log/sidekiq.log
+  -L ${GITLAB_INSTALL_DIR}/log/sidekiq.log'
 user=git
 autostart=true
 autorestart=true
@@ -253,7 +259,7 @@ stderr_logfile=${GITLAB_LOG_DIR}/supervisor/%(program_name)s.log
 EOF
 
 # configure supervisord to start gitlab-workhorse
-cat > /etc/supervisor/conf.d/gitlab-workhorse.conf <<EOF
+cat > /etc/supervisord.d/gitlab-workhorse.ini <<EOF
 [program:gitlab-workhorse]
 priority=20
 directory=${GITLAB_INSTALL_DIR}
@@ -274,12 +280,12 @@ stderr_logfile=${GITLAB_INSTALL_DIR}/log/%(program_name)s.log
 EOF
 
 # configure supervisord to start mail_room
-cat > /etc/supervisor/conf.d/mail_room.conf <<EOF
+cat > /etc/supervisord.d/mail_room.ini <<EOF
 [program:mail_room]
 priority=20
 directory=${GITLAB_INSTALL_DIR}
 environment=HOME=${GITLAB_HOME}
-command=bundle exec mail_room -c ${GITLAB_INSTALL_DIR}/config/mail_room.yml
+command=scl enable rh-ruby22 'bundle exec mail_room -c ${GITLAB_INSTALL_DIR}/config/mail_room.yml'
 user=git
 autostart={{GITLAB_INCOMING_EMAIL_ENABLED}}
 autorestart=true
@@ -289,7 +295,7 @@ EOF
 
 # configure supervisor to start sshd
 mkdir -p /var/run/sshd
-cat > /etc/supervisor/conf.d/sshd.conf <<EOF
+cat > /etc/supervisord.d/sshd.ini <<EOF
 [program:sshd]
 directory=/
 command=/usr/sbin/sshd -D -E ${GITLAB_LOG_DIR}/supervisor/%(program_name)s.log
@@ -301,7 +307,7 @@ stderr_logfile=${GITLAB_LOG_DIR}/supervisor/%(program_name)s.log
 EOF
 
 # configure supervisord to start nginx
-cat > /etc/supervisor/conf.d/nginx.conf <<EOF
+cat > /etc/supervisord.d/nginx.ini <<EOF
 [program:nginx]
 priority=20
 directory=/tmp
@@ -314,11 +320,11 @@ stderr_logfile=${GITLAB_LOG_DIR}/supervisor/%(program_name)s.log
 EOF
 
 # configure supervisord to start crond
-cat > /etc/supervisor/conf.d/cron.conf <<EOF
+cat > /etc/supervisord.d/cron.ini <<EOF
 [program:cron]
 priority=20
 directory=/tmp
-command=/usr/sbin/cron -f
+command=/usr/sbin/crond -n
 user=root
 autostart=true
 autorestart=true
@@ -327,5 +333,9 @@ stderr_logfile=${GITLAB_LOG_DIR}/supervisor/%(program_name)s.log
 EOF
 
 # purge build dependencies and cleanup apt
-DEBIAN_FRONTEND=noninteractive apt-get purge -y --auto-remove ${BUILD_DEPENDENCIES}
-rm -rf /var/lib/apt/lists/*
+yum remove -y gcc gcc-c++ patch cmake \
+  glibc-devel ruby-devel community-mysql-devel postgresql-devel \
+  zlib-devel libyaml-devel openssl-devel gdbm-devel readline-devel \
+  ncurses-devel libxml2-devel libxslt-devel \
+  libcurl-devel libicu-devel 
+yum clean all

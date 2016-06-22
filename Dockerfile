@@ -3,12 +3,14 @@ MAINTAINER jbrooks@redhat.com
 
 RUN yum update -y; yum clean all
 RUN yum -y install epel-release; yum clean all
+RUN yum -y install centos-release-scl; yum clean all
 RUN yum install -y supervisor logrotate nginx openssh-server \
-    git postgresql ruby rubygems python python-docutils \
+    git postgresql rh-ruby22 rh-ruby22-rubygems python python-docutils \
     mariadb-devel libpqxx zlib libyaml gdbm readline redis \
-    ncurses libffi libxml2 libxslt libcurl libicu rubygem-bundler \
+    ncurses libffi libxml2 libxslt libcurl libicu rh-ruby22-rubygem-bundler \
     which sudo passwd tar initscripts cronie nodejs; yum clean all
 RUN sed -i 's/Defaults    requiretty/#Defaults    requiretty/g' /etc/sudoers
+RUN echo "source /opt/rh/rh-ruby22/enable" | tee -a /etc/profile.d/ruby22.sh
 
 ENV GITLAB_VERSION=8.8.5 \
     GITLAB_SHELL_VERSION=2.7.2 \
