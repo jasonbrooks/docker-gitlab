@@ -175,10 +175,10 @@ gitlab_check_database_connection() {
     mysql2)
       prog="mysqladmin -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} ${DB_PASS:+-p$DB_PASS} status"
       ;;
-    postgresql)
-      prog=$(find /usr/lib/pgsql/ -name pg_isready)
-      prog="${prog} -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME} -t 1"
-      ;;
+#    postgresql)
+#      prog=$(find /usr/lib/pgsql/ -name pg_isready)
+#      prog="${prog} -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME} -t 1"
+#      ;;
   esac
   timeout=60
   while ! ${prog} >/dev/null 2>&1
