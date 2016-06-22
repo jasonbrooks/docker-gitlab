@@ -221,13 +221,13 @@ gitlab_configure_database() {
 
 gitlab_finalize_redis_parameters() {
   # is a redis container linked?
-  if [[ -n ${REDISIO_PORT_6379_TCP_ADDR} ]]; then
-    REDIS_HOST=${REDIS_HOST:-${REDISIO_PORT_6379_TCP_ADDR}}
-    REDIS_PORT=${REDIS_PORT:-${REDISIO_PORT_6379_TCP_PORT}}
+  if [[ -n ${REDIS_PORT_6379_TCP_ADDR} ]]; then
+    REDIS_HOST=${REDIS_HOST:-${REDIS_PORT_6379_TCP_ADDR}}
+    REDIS_PORT=${REDIS_PORT:-${REDIS_PORT_6379_TCP_PORT}}
   fi
 
   # set default redis port if not specified
-  REDIS_PORT=${REDIS_PORT:-6379}
+#  REDIS_PORT=${REDIS_PORT:-6379}
 
   if [[ -z ${REDIS_HOST} ]]; then
     echo
