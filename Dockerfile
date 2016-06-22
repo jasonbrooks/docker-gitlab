@@ -6,7 +6,7 @@ RUN yum -y install epel-release; yum clean all
 RUN yum -y install centos-release-scl; yum clean all
 RUN yum install -y supervisor logrotate nginx openssh-server \
     git postgresql rh-ruby22 rh-ruby22-rubygems python python-docutils \
-    mariadb-devel libpqxx zlib libyaml gdbm readline redis \
+    mariadb-devel libpqxx zlib libyaml gdbm readline redis gettext \
     ncurses libffi libxml2 libxslt libcurl libicu rh-ruby22-rubygem-bundler \
     which sudo passwd tar initscripts cronie nodejs; yum clean all
 RUN sed -i 's/Defaults    requiretty/#Defaults    requiretty/g' /etc/sudoers
