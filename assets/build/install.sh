@@ -143,7 +143,7 @@ cp ${GITLAB_INSTALL_DIR}/lib/support/init.d/gitlab /etc/init.d/gitlab
 chmod +x /etc/init.d/gitlab
 
 # disable default nginx configuration and enable gitlab's nginx configuration
-rm -rf /etc/nginx/sites-enabled/default
+rm -rf /etc/nginx/conf.d/default.conf
 
 # configure sshd
 sed -i \

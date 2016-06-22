@@ -15,9 +15,9 @@ GITLAB_RESQUE_CONFIG="${GITLAB_INSTALL_DIR}/config/resque.yml"
 GITLAB_SECRETS_CONFIG="${GITLAB_INSTALL_DIR}/config/secrets.yml"
 GITLAB_ROBOTS_CONFIG="${GITLAB_INSTALL_DIR}/public/robots.txt"
 GITLAB_SHELL_CONFIG="${GITLAB_SHELL_INSTALL_DIR}/config.yml"
-GITLAB_NGINX_CONFIG="/etc/nginx/sites-enabled/gitlab"
-GITLAB_CI_NGINX_CONFIG="/etc/nginx/sites-enabled/gitlab_ci"
-GITLAB_REGISTRY_NGINX_CONFIG="/etc/nginx/sites-enabled/gitlab-registry"
+GITLAB_NGINX_CONFIG="/etc/nginx/conf.d/gitlab.conf"
+GITLAB_CI_NGINX_CONFIG="/etc/nginx/conf.d/gitlab_ci.conf"
+GITLAB_REGISTRY_NGINX_CONFIG="/etc/nginx/conf.d/gitlab-registry.conf"
 
 # Compares two version strings `a` and `b`
 # Returns
@@ -270,7 +270,7 @@ gitlab_configure_redis() {
 
 gitlab_configure_gitlab_workhorse() {
   echo "Configuring gitlab::gitlab-workhorse..."
-  update_template /etc/supervisor/conf.d/gitlab-workhorse.conf \
+  update_template /etc/supervisord.d/gitlab-workhorse.ini \
     GITLAB_RELATIVE_URL_ROOT \
     GITLAB_WORKHORSE_TIMEOUT
 }
@@ -401,7 +401,7 @@ gitlab_configure_mailroom() {
 
   # enable/disable startup of mailroom
   echo "mail_room_enabled=${GITLAB_INCOMING_EMAIL_ENABLED}" >> /etc/default/gitlab
-  update_template /etc/supervisor/conf.d/mail_room.conf GITLAB_INCOMING_EMAIL_ENABLED
+  update_template /etc/supervisord.d/mail_room.ini GITLAB_INCOMING_EMAIL_ENABLED
 }
 
 gitlab_configure_ldap() {
@@ -654,7 +654,7 @@ gitlab_configure_sidekiq() {
   echo "Configuring gitlab::sidekiq..."
 
   # configure sidekiq
-  update_template /etc/supervisor/conf.d/sidekiq.conf \
+  update_template /etc/supervisord.d/sidekiq.ini \
     SIDEKIQ_CONCURRENCY \
     SIDEKIQ_SHUTDOWN_TIMEOUT
 
